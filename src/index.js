@@ -85,7 +85,7 @@ module.exports = function connectMongo(connect) {
                 // New native connection using url + mongoOptions
                 const startTime = Date.now();
                 MongoClient.connect(options.url, options.mongoOptions || {}, (err, db) => {
-                    this.logger.access('|connect|/mongodb-session|' + (err ? 500 : 200) + '|', (Date.now() - startTime));
+                    this.logger.access('|connect|/mongodb-session|' + (err ? 500 : 200) + '|' + (Date.now() - startTime));
                     return newConnectionCallback(err, db);
                 });
             } else if (options.mongooseConnection) {
@@ -106,11 +106,11 @@ module.exports = function connectMongo(connect) {
                 const startTime = Date.now();
                 options.dbPromise
                     .then(db => {
-                        this.logger.access('|connect|/mongodb-session|200|', Date.now() - startTime);
+                        this.logger.access('|connect|/mongodb-session|200|' + (Date.now() - startTime));
                         this.handleNewConnectionAsync(db)
                     })
                     .catch(err => {
-                        this.logger.access('|connect|/mongodb-session|500|', Date.now() - startTime);
+                        this.logger.access('|connect|/mongodb-session|500|' + (Date.now() - startTime));
                         this.connectionFailed(err);
                     });
             } else {
@@ -134,7 +134,7 @@ module.exports = function connectMongo(connect) {
                 .setAutoRemoveAsync()
                 .then(() => {
                     this.changeState('connected');
-                    this.logger.access('|collection|/mongodb-session|200|', Date.now() - startTime);
+                    this.logger.access('|collection|/mongodb-session|200|' + (Date.now() - startTime));
                 });
         }
 
@@ -227,7 +227,7 @@ module.exports = function connectMongo(connect) {
                     }
                 })
                 .asCallback((err, sess) => {
-                    this.logger.access('|get|/mongodb-session|' + (err ? 500 : 200) + '|', Date.now() - startTime);
+                    this.logger.access('|get|/mongodb-session|' + (err ? 500 : 200) + '|' + (Date.now() - startTime));
                     callback(err, sess);
                 });
         }
@@ -276,7 +276,7 @@ module.exports = function connectMongo(connect) {
                     this.emit('set', sid);
                 })
                 .asCallback(err => {
-                    this.logger.access('|set|/mongodb-session|' + (err ? 500 : 200) + '|', Date.now() - startTime);
+                    this.logger.access('|set|/mongodb-session|' + (err ? 500 : 200) + '|' + (Date.now() - startTime));
                     callback(err);
                 });
         }
@@ -318,7 +318,7 @@ module.exports = function connectMongo(connect) {
                     }
                 })
                 .asCallback(err => {
-                    this.logger.access('|touch|/mongodb-session|'+ (err ? 500 : 200) + '|', Date.now() - startTime);
+                    this.logger.access('|touch|/mongodb-session|' + (err ? 500 : 200) + '|' + (Date.now() - startTime));
                     callback(err);
                 });
         }
@@ -329,7 +329,7 @@ module.exports = function connectMongo(connect) {
                 .then(collection => collection.removeAsync({ _id: this.computeStorageId(sid) }))
                 .then(() => this.emit('destroy', sid))
                 .asCallback(err => {
-                    this.logger.access('|destroy|/mongodb-session|'+ (err ? 500 : 200) + '|', Date.now() - startTime);
+                    this.logger.access('|destroy|/mongodb-session|' + (err ? 500 : 200) + '|' + (Date.now() - startTime));
                     callback(err);
                 });
         }
@@ -350,7 +350,7 @@ module.exports = function connectMongo(connect) {
             if (this.db) {
                 const startTime = Date.now();
                 this.db.close((err, result) => {
-                    this.logger.access('|close|/mongodb-session|'+ (err ? 500 : 200) + '|', Date.now() - startTime);
+                    this.logger.access('|close|/mongodb-session|' + (err ? 500 : 200) + '|' + (Date.now() - startTime));
                 });
             }
         }
