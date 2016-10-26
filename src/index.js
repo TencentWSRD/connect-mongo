@@ -85,7 +85,7 @@ module.exports = function connectMongo(connect) {
                 // New native connection using url + mongoOptions
                 const startTime = Date.now();
                 MongoClient.connect(options.url, options.mongoOptions || {}, (err, db) => {
-                    this.logger.access('|connect|/mongodb-session|', err ? 500 : 200, '|', Date.now() - startTime);
+                    this.logger.access('|connect|/mongodb-session|' + (err ? 500 : 200) + '|', (Date.now() - startTime));
                     return newConnectionCallback(err, db);
                 });
             } else if (options.mongooseConnection) {
@@ -227,7 +227,7 @@ module.exports = function connectMongo(connect) {
                     }
                 })
                 .asCallback((err, sess) => {
-                    this.logger.access('|get|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    this.logger.access('|get|/mongodb-session|' + (err ? 500 : 200) + '|', Date.now() - startTime);
                     callback(err, sess);
                 });
         }
@@ -263,7 +263,7 @@ module.exports = function connectMongo(connect) {
             if (this.options.touchAfter > 0) {
                 s.lastModified = new Date();
             }
-            const startTime = Date.now(); 
+            const startTime = Date.now();
             return this.collectionReady()
                 .then(collection => collection.updateAsync({ _id: this.computeStorageId(sid) }, s, { upsert: true }))
                 .then(responseArray => {
@@ -276,7 +276,7 @@ module.exports = function connectMongo(connect) {
                     this.emit('set', sid);
                 })
                 .asCallback(err => {
-                    this.logger.access('|set|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    this.logger.access('|set|/mongodb-session|' + (err ? 500 : 200) + '|', Date.now() - startTime);
                     callback(err);
                 });
         }
@@ -307,7 +307,7 @@ module.exports = function connectMongo(connect) {
             } else {
                 updateFields.expires = new Date(Date.now() + this.ttl * 1000);
             }
-            const startTime = Date.now(); 
+            const startTime = Date.now();
             return this.collectionReady()
                 .then(collection => collection.updateAsync({ _id: this.computeStorageId(sid) }, { $set: updateFields }))
                 .then(result => {
@@ -318,18 +318,18 @@ module.exports = function connectMongo(connect) {
                     }
                 })
                 .asCallback(err => {
-                    this.logger.access('|touch|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    this.logger.access('|touch|/mongodb-session|'+ (err ? 500 : 200) + '|', Date.now() - startTime);
                     callback(err);
                 });
         }
 
         destroy(sid, callback) {
-            const startTime = Date.now(); 
+            const startTime = Date.now();
             return this.collectionReady()
                 .then(collection => collection.removeAsync({ _id: this.computeStorageId(sid) }))
                 .then(() => this.emit('destroy', sid))
                 .asCallback(err => {
-                    this.logger.access('|destroy|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    this.logger.access('|destroy|/mongodb-session|'+ (err ? 500 : 200) + '|', Date.now() - startTime);
                     callback(err);
                 });
         }
@@ -348,9 +348,9 @@ module.exports = function connectMongo(connect) {
 
         close() {
             if (this.db) {
-                const startTime = Date.now(); 
+                const startTime = Date.now();
                 this.db.close((err, result) => {
-                    this.logger.access('|close|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    this.logger.access('|close|/mongodb-session|'+ (err ? 500 : 200) + '|', Date.now() - startTime);
                 });
             }
         }
