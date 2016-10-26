@@ -69,6 +69,7 @@ module.exports = function connectMongo(connect) {
             this.transformFunctions = computeTransformFunctions(options, true);
 
             this.options = options;
+            this.logger = options.logger || { access: () => { }, };
 
             this.changeState('init');
 
@@ -82,7 +83,11 @@ module.exports = function connectMongo(connect) {
 
             if (options.url) {
                 // New native connection using url + mongoOptions
-                MongoClient.connect(options.url, options.mongoOptions || {}, newConnectionCallback);
+                const startTime = Date.now();
+                MongoClient.connect(options.url, options.mongoOptions || {}, (err, db) => {
+                    this.logger.access('|connect|/mongodb-session|', err ? 500 : 200, '|', Date.now() - startTime);
+                    return newConnectionCallback(err, db);
+                });
             } else if (options.mongooseConnection) {
                 // Re-use existing or upcoming mongoose connection
                 if (options.mongooseConnection.readyState === 1) {
@@ -98,9 +103,16 @@ module.exports = function connectMongo(connect) {
                     options.db.open(newConnectionCallback);
                 }
             } else if (options.dbPromise) {
+                const startTime = Date.now();
                 options.dbPromise
-                    .then(db => this.handleNewConnectionAsync(db))
-                    .catch(err => this.connectionFailed(err));
+                    .then(db => {
+                        this.logger.access('|connect|/mongodb-session|200|', Date.now() - startTime);
+                        this.handleNewConnectionAsync(db)
+                    })
+                    .catch(err => {
+                        this.logger.access('|connect|/mongodb-session|500|', Date.now() - startTime);
+                        this.connectionFailed(err);
+                    });
             } else {
                 throw new Error('Connection strategy not found');
             }
@@ -116,23 +128,27 @@ module.exports = function connectMongo(connect) {
 
         handleNewConnectionAsync(db) {
             this.db = db;
+            const startTime = Date.now();
             return this
                 .setCollection(db.collection(this.collectionName))
                 .setAutoRemoveAsync()
-                    .then(() => this.changeState('connected'));
+                .then(() => {
+                    this.changeState('connected');
+                    this.logger.access('|collection|/mongodb-session|200|', Date.now() - startTime);
+                });
         }
 
         setAutoRemoveAsync() {
             let removeQuery = { expires: { $lt: new Date() } };
             switch (this.autoRemove) {
-            case 'native':
-                return this.collection.ensureIndexAsync({ expires: 1 }, { expireAfterSeconds: 0 });
-            case 'interval':
-                this.timer = setInterval(() => this.collection.remove(removeQuery, { w: 0 }), this.autoRemoveInterval * 1000 * 60);
-                this.timer.unref();
-                return Promise.resolve();
-            default:
-                return Promise.resolve();
+                case 'native':
+                    return this.collection.ensureIndexAsync({ expires: 1 }, { expireAfterSeconds: 0 });
+                case 'interval':
+                    this.timer = setInterval(() => this.collection.remove(removeQuery, { w: 0 }), this.autoRemoveInterval * 1000 * 60);
+                    this.timer.unref();
+                    return Promise.resolve();
+                default:
+                    return Promise.resolve();
             }
         }
 
@@ -164,15 +180,15 @@ module.exports = function connectMongo(connect) {
             if (!promise) {
                 promise = new Promise((resolve, reject) => {
                     switch (this.state) {
-                    case 'connected':
-                        resolve(this.collection);
-                        break;
-                    case 'connecting':
-                        this.once('connected', () => resolve(this.collection));
-                        break;
-                    case 'disconnected':
-                        reject(new Error('Not connected'));
-                        break;
+                        case 'connected':
+                            resolve(this.collection);
+                            break;
+                        case 'connecting':
+                            this.once('connected', () => resolve(this.collection));
+                            break;
+                        case 'disconnected':
+                            reject(new Error('Not connected'));
+                            break;
                     }
                 });
                 this.collectionReadyPromise = promise;
@@ -191,6 +207,7 @@ module.exports = function connectMongo(connect) {
         /* Public API */
 
         get(sid, callback) {
+            const startTime = Date.now();
             return this.collectionReady()
                 .then(collection => collection.findOneAsync({
                     _id: this.computeStorageId(sid),
@@ -209,7 +226,10 @@ module.exports = function connectMongo(connect) {
                         return s;
                     }
                 })
-                .asCallback(callback);
+                .asCallback((err, sess) => {
+                    this.logger.access('|get|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    callback(err, sess);
+                });
         }
 
         set(sid, session, callback) {
@@ -243,7 +263,7 @@ module.exports = function connectMongo(connect) {
             if (this.options.touchAfter > 0) {
                 s.lastModified = new Date();
             }
-
+            const startTime = Date.now(); 
             return this.collectionReady()
                 .then(collection => collection.updateAsync({ _id: this.computeStorageId(sid) }, s, { upsert: true }))
                 .then(responseArray => {
@@ -255,7 +275,10 @@ module.exports = function connectMongo(connect) {
                     }
                     this.emit('set', sid);
                 })
-                .asCallback(callback);
+                .asCallback(err => {
+                    this.logger.access('|set|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    callback(err);
+                });
         }
 
         touch(sid, session, callback) {
@@ -284,7 +307,7 @@ module.exports = function connectMongo(connect) {
             } else {
                 updateFields.expires = new Date(Date.now() + this.ttl * 1000);
             }
-
+            const startTime = Date.now(); 
             return this.collectionReady()
                 .then(collection => collection.updateAsync({ _id: this.computeStorageId(sid) }, { $set: updateFields }))
                 .then(result => {
@@ -294,14 +317,21 @@ module.exports = function connectMongo(connect) {
                         this.emit('touch', sid);
                     }
                 })
-                .asCallback(callback);
+                .asCallback(err => {
+                    this.logger.access('|touch|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    callback(err);
+                });
         }
 
         destroy(sid, callback) {
+            const startTime = Date.now(); 
             return this.collectionReady()
                 .then(collection => collection.removeAsync({ _id: this.computeStorageId(sid) }))
                 .then(() => this.emit('destroy', sid))
-                .asCallback(callback);
+                .asCallback(err => {
+                    this.logger.access('|destroy|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                    callback(err);
+                });
         }
 
         length(callback) {
@@ -318,7 +348,10 @@ module.exports = function connectMongo(connect) {
 
         close() {
             if (this.db) {
-                this.db.close();
+                const startTime = Date.now(); 
+                this.db.close((err, result) => {
+                    this.logger.access('|close|/mongodb-session|',err ? 500 : 200, '|', Date.now() - startTime);
+                });
             }
         }
     }
