@@ -4,3 +4,4 @@ coverage
 src-es5
 *.log
 yarn.lock
+.vscode/
