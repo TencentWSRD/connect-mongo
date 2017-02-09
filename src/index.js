@@ -241,8 +241,8 @@ module.exports = function connectMongo(connect) {
           ],
         }))
         .then(session => {
-          if (session && session.body) {
-            const s = this.transformFunctions.unserialize(session.body);
+          if (session && session.session) {
+            const s = this.transformFunctions.unserialize(session.session);
             if (this.options.touchAfter > 0 && session.lastModified) {
               s.lastModified = session.lastModified;
             }
@@ -267,9 +267,7 @@ module.exports = function connectMongo(connect) {
       try {
         s = {
           _id: this.computeStorageId(sid),
-          body: this.transformFunctions.serialize(session),
-          first_activity: new Date().toISOString(),
-          last_activity: new Date().toISOString(),
+          session: this.transformFunctions.serialize(session),
         };
       } catch (err) {
         return callback(err);
@@ -338,8 +336,6 @@ module.exports = function connectMongo(connect) {
       } else {
         updateFields.expires = new Date(Date.now() + this.ttl * 1000);
       }
-      updateFields.last_activity = new Date().toISOString();
-      // console.log('allan: touch: updateFields: ', updateFields);
       const startTime = Date.now();
       return this.collectionReady()
         .then(collection => collection.updateAsync({
